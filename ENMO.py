@@ -116,3 +116,51 @@ resultat = enmo_par_epoque(
 )
 
 print(resultat)
+
+## Tracé des deux panneaux (suggestion de Copilot et corrections)
+
+La figure demandée comporte deux panneaux : en haut, les barres de l'ENMO intégré par époque, en bas, l'ENMO brut en fonction du temps en minutes.
+
+**Ce que fait le code de Copilot**
+- Crée une figure à deux panneaux avec `plt.subplots(2, 1)`.
+- Panneau du haut : `ax1.bar` avec les valeurs intégrées par époque.
+- Panneau du bas : `ax2.plot` avec l'ENMO brut, l'axe des temps étant calculé à partir de l'indice de ligne et de la fréquence.
+- Ajoute des lignes verticales en pointillés aux limites des époques, une légende, une grille et des couleurs personnalisées.
+
+**Problèmes repérés et corrections**
+- **Axe des x des barres** : Copilot place les barres selon le numéro d'époque (0, 1, 2…), alors que le panneau du bas est en minutes. Les deux panneaux ne sont donc pas alignés. On place les barres à `debut_min` avec une largeur `n_secondes / 60`, et on partage l'axe des x (`sharex=True`).
+- **Fréquence** : l'appel utilisait `frequence_hz=100`, alors que le fichier est à 50 Hz. Le temps est maintenant lu directement dans la colonne `t` du fichier, ce qui supprime le besoin de la fréquence pour le tracé.
+- **Nom de colonne** : `"ENMO"` remplacé par la colonne `enmo` du notebook.
+- **Style** : suppression des pointillés, de la légende et des couleurs vives pour se rapprocher des figures de l'énoncé (barres grises, courbe bleue fine et semi-transparente, mêmes titres et libellés).
+- **Sauvegarde** : `fig.savefig(...)` en fin de code Copilot provoquerait une erreur, car `fig` n'existe que dans la fonction. La fonction renvoie maintenant la figure.
+- **Appels en double** supprimés.
+
+**Choix retenu** : la version corrigée, appelée une fois pour chaque durée d'époque (10 s, 30 s, 60 s).
+
+import matplotlib.pyplot as plt
+
+def tracer_enmo(df, resultat_epoque, n_secondes, enmo_colonne="enmo"):
+    """Deux panneaux : ENMO intégré par époque (barres) et ENMO brut en fonction du temps (min)."""
+    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(8, 6))
+
+    # Panneau 1 : barres placées au début de chaque époque (en minutes)
+    ax1.bar(resultat_epoque["debut_min"], resultat_epoque["ENMO_g_min"],
+            width=n_secondes / 60 * 0.95, align="edge", color="gray", alpha=0.7)
+    ax1.set_title(f"ENMO integrated over {n_secondes:.1f} s intervals")
+    ax1.set_ylabel("Integrated ENMO (g.min)")
+
+    # Panneau 2 : ENMO brut en fonction du temps en minutes
+    ax2.plot(df["t"] / 60, df[enmo_colonne], alpha=0.5)
+    ax2.set_title("ENMO over Time")
+    ax2.set_xlabel("Time (minutes)")
+    ax2.set_ylabel("ENMO (g)")
+
+    plt.tight_layout()
+    return fig
+
+fs = 1 / df["t"].diff().median()   # ≈ 50 Hz
+
+for n in (10, 30, 60):
+    resultat = enmo_par_epoque(df, n_secondes=n, frequence_hz=fs)
+    fig = tracer_enmo(df, resultat, n_secondes=n)
+    plt.show()
