@@ -23,5 +23,5 @@ Le fichier `0_z.csv` commence par une ligne de commentaire (`# accelerometer dat
 
 import pandas as pd
 
-# Option 2 : Si le commentaire commence par un caractère spécifique (ex: #)
+# choix de l'Option 2 :
 df = pd.read_csv('0_z.csv', comment='#')
