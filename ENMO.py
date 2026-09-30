@@ -25,3 +25,34 @@ import pandas as pd
 
 # choix de l'Option 2 :
 df = pd.read_csv('0_z.csv', comment='#')
+
+## Calcul de l'ENMO (suggestions de Copilot et choix retenu)
+
+L'ENMO (*Euclidean Norm Minus One*) se calcule pour chaque échantillon : `sqrt(x² + y² + z²) − 1`, en g. On prend la norme des trois axes, ce qui rend la mesure indépendante de l'orientation du capteur, puis on retire 1 g, la gravité mesurée au repos.
+
+Copilot a proposé trois façons de l'appliquer.
+
+**Option 1 : `calculate_enmo(x, y, z)` appelée sur les colonnes**
+- La fonction prend `x`, `y`, `z` et renvoie l'ENMO. Appelée avec `df['x'], df['y'], df['z']`, elle calcule toutes les lignes d'un coup, grâce à la vectorisation de numpy.
+- Avantage : rapide, lisible, et réutilisable sur un simple nombre ou sur un tableau.
+
+**Option 2 : `df.apply(lambda row: ..., axis=1)`**
+- Appelle la fonction ligne par ligne.
+- Inconvénient : beaucoup plus lente (ici 21 000 lignes) pour un résultat identique, car l'option 1 fait déjà le calcul sur toute la colonne.
+
+**Option 3 : `calculate_enmo_vectorized(df)`**
+- Même calcul vectorisé, mais la fonction prend directement le DataFrame et dépend donc des noms de colonnes `x`, `y`, `z`.
+- Avantage : appel court. Inconvénient : moins générale que l'option 1, qui fonctionne avec n'importe quelles données.
+
+**Corrections apportées au code de Copilot**
+- **Suppression de `np.abs`** : Copilot renvoyait la valeur absolue « pour éviter les valeurs négatives ». Or les valeurs négatives ont un sens : au repos, la norme est parfois légèrement inférieure à 1 g (bruit, calibration). Les rendre positives, ou les tronquer à 0, biaiserait l'intégration par époque. On les conserve.
+- **Chargement** : `skiprows=1` remplacé par `comment='#'` (voir le choix précédent).
+- **Doublons** : les fonctions et l'application de l'ENMO étaient écrites plusieurs fois. Une seule version est conservée.
+
+**Choix retenu : option 1**, avec un appel vectorisé sur les colonnes. Elle est rapide, réutilisable, et ne dépend pas de la structure du DataFrame.
+
+def calculate_enmo(x, y, z):
+    """ENMO = norme euclidienne (x, y, z) - 1, en g. Valeurs négatives conservées."""
+    return np.sqrt(x**2 + y**2 + z**2) - 1
+
+df['enmo'] = calculate_enmo(df['x'], df['y'], df['z'])
