@@ -56,3 +56,63 @@ def calculate_enmo(x, y, z):
     return np.sqrt(x**2 + y**2 + z**2) - 1
 
 df['enmo'] = calculate_enmo(df['x'], df['y'], df['z'])
+
+## Intégration de l'ENMO par époque (suggestion de Copilot et corrections)
+
+Pour chaque époque de N secondes, on regroupe les échantillons consécutifs (N × fréquence d'échantillonnage échantillons par époque) et on somme leur ENMO.
+
+**Ce que fait le code de Copilot**
+- Il vérifie les paramètres (durée et fréquence strictement positives, colonne présente).
+- Il découpe la colonne ENMO en blocs de `N × fréquence` échantillons avec `reshape`, ce qui est rapide et lisible, puis somme chaque bloc.
+- Il ignore la dernière époque si elle est incomplète, pour ne pas comparer des époques de durées différentes.
+- Il renvoie un DataFrame avec le numéro de l'époque et la valeur intégrée.
+
+**Problème repéré : l'échelle**
+Copilot divise la somme par la fréquence puis par 60, ce qui donne l'intégrale exacte de l'ENMO dans le temps. Mais les figures de l'énoncé (par exemple un pic d'environ 122 g.min pour des époques de 10 s) correspondent à la somme de l'ENMO multipliée par la durée de l'époque en minutes. J'ai testé les deux calculs : avec la formule de Copilot, le pic vaut 0,245, loin des figures attendues. On adopte donc la formule qui reproduit l'énoncé.
+
+**Corrections apportées**
+- Valeur intégrée = somme des ENMO de l'époque × (N / 60).
+- Ajout de la colonne `debut_min` (début de l'époque en minutes) pour tracer les barres sur l'axe du temps.
+- Le nom de la colonne ENMO passé en paramètre est `enmo`, comme dans le reste du notebook.
+- Les valeurs négatives de l'ENMO sont conservées (pas de valeur absolue).
+
+**Limite** : la fonction suppose une fréquence d'échantillonnage constante (50 Hz ici) et des données sans trou. C'est le cas du fichier fourni (21 000 échantillons pour 420 s).
+
+def enmo_par_epoque(df, n_secondes, frequence_hz, enmo_colonne="enmo"):
+    """Intègre l'ENMO par époque (g.min) : somme des ENMO x durée de l'époque en minutes."""
+    if n_secondes <= 0:
+        raise ValueError("n_secondes doit être strictement positif.")
+    if frequence_hz <= 0:
+        raise ValueError("frequence_hz doit être strictement positive.")
+    if enmo_colonne not in df.columns:
+        raise ValueError(f"La colonne {enmo_colonne!r} est absente du DataFrame.")
+
+    donnees = df[enmo_colonne].astype(float).to_numpy()
+
+    # Nombre d'échantillons par époque
+    echantillons_par_epoque = int(round(n_secondes * frequence_hz))
+    if echantillons_par_epoque <= 0:
+        raise ValueError("L'époque doit contenir au moins un échantillon.")
+
+    # On conserve uniquement les époques complètes
+    nombre_epoques = len(donnees) // echantillons_par_epoque
+    donnees = donnees[:nombre_epoques * echantillons_par_epoque]
+
+    # Somme par époque, multipliée par la durée de l'époque en minutes
+    sommes = donnees.reshape(nombre_epoques, echantillons_par_epoque).sum(axis=1)
+    resultat = sommes * (n_secondes / 60)
+
+    return pd.DataFrame({
+        "epoque": np.arange(nombre_epoques),
+        "debut_min": np.arange(nombre_epoques) * n_secondes / 60,
+        "ENMO_g_min": resultat,
+    })
+    fs = 1 / df['t'].diff().median()   # ≈ 50 Hz
+
+resultat = enmo_par_epoque(
+    df,
+    n_secondes=60,
+    frequence_hz=fs
+)
+
+print(resultat)
